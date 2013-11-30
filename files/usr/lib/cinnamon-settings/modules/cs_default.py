@@ -26,14 +26,15 @@ preferred_app_defs = [
     # application/xhtml+xml and x-scheme-handler/https,
     # hence the "*" pattern
     ( "x-scheme-handler/http",   "x-scheme-handler/http",      _("_Web") ),
-    ( "x-scheme-handler/mailto", "x-scheme-handler/mailto",    _("_Mail") ),
-    ( "text/calendar",           "text/calendar",              _("_Calendar") ),
-
+    
     # 1st mimetype is to let us find apps
     # 2nd mimetype is to set default handler for (so we handle all of that type, not just a specific format)
     ( "audio/x-vorbis+ogg",      "audio",                    _("M_usic") ),
     ( "video/x-ogm+ogg",         "video",                    _("_Video") ),
-    ( "image/jpeg",              "image",                    _("_Photos") )
+    ( "image/jpeg",              "image",                    _("_Photos") ),
+    ( "text/plain",               "text/plain",                  _("_Text") ),
+    ( "x-scheme-handler/mailto", "x-scheme-handler/mailto",    _("_Mail") ),
+    #( "text/calendar",           "text/calendar",              _("_Calendar") ),
 ]
 
 removable_media_defs = [
@@ -312,7 +313,7 @@ class Module:
     def __init__(self, content_box):
         keywords = _("media, defaults, applications, programs, removable, browser, email, calendar, music, videos, photos, images, cd, autostart")
         advanced = False
-        sidePage = SidePage(_("Applications & Removable Media"), "default-applications.svg", keywords, advanced, content_box)
+        sidePage = SidePage(_("Default Applications"), "default-applications.svg", keywords, advanced, content_box)
         self.sidePage = sidePage
         self.name = "default"
         self.category = "prefs"
