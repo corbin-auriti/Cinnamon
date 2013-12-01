@@ -32,7 +32,7 @@ preferred_app_defs = [
     ( "audio/x-vorbis+ogg",      "audio",                    _("M_usic") ),
     ( "video/x-ogm+ogg",         "video",                    _("_Video") ),
     ( "image/jpeg",              "image",                    _("_Photos") ),
-    ( "text/plain",               "text/plain",                  _("_Text") ),
+    ( "text/plain",               "text",                  _("_Text") ),
     ( "x-scheme-handler/mailto", "x-scheme-handler/mailto",    _("_Mail") ),
     #( "text/calendar",           "text/calendar",              _("_Calendar") ),
 ]
@@ -330,7 +330,7 @@ class Module:
         for d in preferred_app_defs:
             table.addRow(d[PREF_LABEL], DefaultAppChooserButton(d[PREF_CONTENT_TYPE], d[PREF_GEN_CONTENT_TYPE]))
 
-        return ColumnBox(_("Default Applications"), table)
+        return ColumnBox(_("Select applications to open certain types of files"), table)
 
     def onMoreClicked(self, button):
         self.other_type_dialog.doShow(button.get_toplevel())
