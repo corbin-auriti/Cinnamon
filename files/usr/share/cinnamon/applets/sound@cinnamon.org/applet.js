@@ -12,6 +12,7 @@ const Gvc = imports.gi.Gvc;
 const Pango = imports.gi.Pango;
 const Tooltips = imports.ui.tooltips;
 const Main = imports.ui.main;
+const Settings = imports.ui.settings;
 
 const PropIFace = {
     name: 'org.freedesktop.DBus.Properties',
@@ -606,8 +607,7 @@ Player.prototype = {
                 if (this._trackCoverFile.match(/^http/)) {
                     this._hideCover();
                     let cover = Gio.file_new_for_uri(decodeURIComponent(this._trackCoverFile));
-                    if (!this._trackCoverFileTmp)
-                        this._trackCoverFileTmp = Gio.file_new_tmp('XXXXXX.mediaplayer-cover')[0];
+                    this._trackCoverFileTmp = Gio.file_new_tmp('XXXXXX.mediaplayer-cover')[0];
                     cover.read_async(null, null, Lang.bind(this, this._onReadCover));
                 }
                 else {
@@ -619,6 +619,7 @@ Player.prototype = {
             else
                 this._showCover(false);
         }
+        this._system_status_button.setAppletTextIcon(this, true);
     },
 
     _getMetadata: function() {
@@ -632,15 +633,20 @@ Player.prototype = {
         this._playerStatus = status;
         if (status == "Playing") {
             this._playButton.setIcon("media-playback-pause");
+            this._system_status_button.setAppletTextIcon(this, true);
             this._runTimer();
         }
         else if (status == "Paused") {
             this._playButton.setIcon("media-playback-start");
+            this._system_status_button.setAppletTextIcon(this, false);
             this._pauseTimer();
         }
         else if (status == "Stopped") {
             this._playButton.setIcon("media-playback-start");
+            this._system_status_button.setAppletTextIcon(this, false);
             this._stopTimer();
+        } else {
+            this._system_status_button.setAppletTextIcon(this, false);
         }
 
         this._playerInfo.setImage("player-" + status.toLowerCase());
@@ -746,6 +752,7 @@ Player.prototype = {
                     b.add_actor(c);
                     this._trackCover.set_child(b);
                 }
+                this._system_status_button.setAppletTextIcon(this, cover_path);
                 /*Tweener.addTween(this._trackCover, { opacity: 255,
                     time: 0.3,
                     transition: 'easeInCubic'
@@ -789,17 +796,22 @@ MediaPlayerLauncher.prototype = {
 
 };
 
-function MyApplet(orientation, panel_height) {
-    this._init(orientation, panel_height);
+function MyApplet(orientation, panel_height, instanceId) {
+    this._init(orientation, panel_height, instanceId);
 }
 
 MyApplet.prototype = {
-    __proto__: Applet.IconApplet.prototype,
+    __proto__: Applet.TextIconApplet.prototype,
 
-    _init: function(orientation, panel_height) {
-        Applet.IconApplet.prototype._init.call(this, orientation, panel_height);
+    _init: function(orientation, panel_height, instanceId) {
+        Applet.TextIconApplet.prototype._init.call(this, orientation, panel_height);
 
         try {
+            this.settings = new Settings.AppletSettings(this, "sound@cinnamon.org", instanceId);
+            this.settings.bindProperty(Settings.BindingDirection.IN, "showtrack", "showtrack", this.on_settings_changed, null);
+            this.settings.bindProperty(Settings.BindingDirection.IN, "showalbum", "showalbum", this.on_settings_changed, null);
+            this.settings.bindProperty(Settings.BindingDirection.IN, "truncatetext", "truncatetext", this.on_settings_changed, null);
+
             this.menuManager = new PopupMenu.PopupMenuManager(this);
             this.menu = new Applet.AppletPopupMenu(this, orientation);
             this.menuManager.addMenu(this.menu);
@@ -835,6 +847,8 @@ MyApplet.prototype = {
             this._inputMutedId = 0;
 
             this._icon_name = '';
+            this._icon_path = null;
+            this._icon_path_prev = null;
 
             this.actor.connect('scroll-event', Lang.bind(this, this._onScrollEvent));
 
@@ -853,6 +867,22 @@ MyApplet.prototype = {
         }
         catch (e) {
             global.logError(e);
+        }
+    },
+
+    on_settings_changed : function() {
+        if (!this.showtrack) {
+            this.setAppletText();
+        }
+
+        if (!this.showalbum) {
+            this.setAppletIcon();
+        }
+
+        if (this.showtrack || this.showalbum) {
+            for (owner in this._players) {
+                this._addPlayer(owner);
+            }
         }
     },
 
@@ -910,7 +940,7 @@ MyApplet.prototype = {
     },
 
     _onButtonReleaseEvent: function (actor, event) {
-        Applet.IconApplet.prototype._onButtonReleaseEvent.call(this, actor, event);
+        Applet.TextIconApplet.prototype._onButtonReleaseEvent.call(this, actor, event);
 
         if (event.get_button() == 2) {
             if (this._output.is_muted)
@@ -934,9 +964,55 @@ MyApplet.prototype = {
             }
             this._iconTimeoutId = Mainloop.timeout_add(3000, Lang.bind(this, function() {
                 this._iconTimeoutId = null;
-                this.set_applet_icon_symbolic_name(this['_output'].is_muted ? 'audio-volume-muted' : 'audio-x-generic');
+                if (this['_output'].is_muted) {
+                    this.set_applet_icon_symbolic_name('audio-volume-muted');
+                } else if (this._icon_path) {
+                    this.setAppletIcon(true, this._icon_path);
+                } else {
+                    this.set_applet_icon_symbolic_name('audio-x-generic');
+                }
             }));
         }
+    },
+
+    setAppletIcon: function(player, path) {
+        if (this.showalbum && path) {
+            if (path === true) {
+                if (!this._icon_path) {
+                    this._icon_path = this._icon_path_prev;
+                }
+            } else {
+                this._icon_path = this._icon_path_prev = path;
+            }
+
+        } else {
+            this._icon_path = null;
+        }
+
+        if (this._icon_path && player) {
+            if (player === true || player._playerStatus == 'Playing') {
+                this.set_applet_icon_path(this._icon_path);
+            }
+        } else {
+            this._icon_path = null;
+            this.setIconName('audio-x-generic');
+        }
+    },
+
+    setAppletText: function(player) {
+        let title_text = "";
+        if (this.showtrack && player && player._playerStatus == 'Playing') {
+            title_text = player._title.getLabel() + ' - ' + player._artist.getLabel();
+            if (this.truncatetext < title_text.length) {
+                title_text = title_text.substr(0, this.truncatetext) + "...";
+            }
+        } 
+        this.set_applet_label(title_text);
+    },
+
+    setAppletTextIcon: function(player, icon) {
+        this.setAppletIcon(player, icon);
+        this.setAppletText(player);
     },
 
     _nbPlayers: function() {
@@ -979,6 +1055,7 @@ MyApplet.prototype = {
         if (this._outputSlider) this._outputSlider.destroy();
         if (this._inputTitle) this._inputTitle.destroy();
         if (this._inputSlider) this._inputSlider.destroy();
+        this.setAppletTextIcon();
         this.menu.removeAll();
      },
 
@@ -1214,7 +1291,7 @@ MyApplet.prototype = {
 
 };
 
-function main(metadata, orientation, panel_height) {
-    let myApplet = new MyApplet(orientation, panel_height);
+function main(metadata, orientation, panel_height, instanceId) {
+    let myApplet = new MyApplet(orientation, panel_height, instanceId);
     return myApplet;
 }
