@@ -20,21 +20,41 @@ class Module:
         sidePage.add_widget(title)
         
         #Some info about the settings
-        info = Gtk.Label(_("Fonts can make reading text easier, help save screen space, or simply personalize your setup."))
+        info = Gtk.Label(_("These settings can make reading text easier, help save screen space, or simply personalize your desktop."))
         sidePage.add_widget(info)
         
         sidePage.add_widget(Gtk.Separator.new(Gtk.Orientation.HORIZONTAL))
         
-        size_groups = getattr(self, "size_groups", [SizeGroup(SizeGroupMode.HORIZONTAL) for x in range(2)])
-        sidePage.add_widget(size_groups)
-        
-        size_groups[0].add_widget(Gtk.Label(_("Default font")))
-        sidePage.add_widget(GSettingsFontButton("", "org.cinnamon.desktop.interface", "font-name", None))
-        sidePage.add_widget(GSettingsFontButton(_("Document font"), "org.gnome.desktop.interface", "document-font-name", None))
-        sidePage.add_widget(GSettingsFontButton(_("Monospace font"), "org.gnome.desktop.interface", "monospace-font-name", None))
-        sidePage.add_widget(GSettingsFontButton(_("Window title font"), "org.cinnamon.desktop.wm.preferences", "titlebar-font", None))
-        sidePage.add_widget(GSettingsRangeSpin(_("Text scaling factor"), "org.cinnamon.desktop.interface", "text-scaling-factor", None, adjustment_step = 0.1), True)
-        sidePage.add_widget(GSettingsComboBox(_("Antialiasing"), "org.cinnamon.settings-daemon.plugins.xsettings", "antialiasing", None, [(i, i.title()) for i in ("none", "grayscale", "rgba")]), True)
-        sidePage.add_widget(GSettingsComboBox(_("Hinting"), "org.cinnamon.settings-daemon.plugins.xsettings", "hinting", None, [(i, i.title()) for i in ("none", "slight", "medium", "full")]), True)
-        
+        sidePage.add_widget(self.make_combo_group(GSettingsFontButton, _("Default font"), "org.cinnamon.desktop.interface", "font-name", None))
+        sidePage.add_widget(self.make_combo_group(GSettingsFontButton, _("Document font"), "org.gnome.desktop.interface", "document-font-name", None))
+        sidePage.add_widget(self.make_combo_group(GSettingsFontButton, _("Monospace font"), "org.gnome.desktop.interface", "monospace-font-name", None))
+        sidePage.add_widget(self.make_combo_group(GSettingsFontButton, _("Window title font"), "org.cinnamon.desktop.wm.preferences", "titlebar-font", None))
+        sidePage.add_widget(self.make_combo_group(GSettingsRangeSpin, _("Text scaling factor"), "org.cinnamon.desktop.interface", "text-scaling-factor", None), True)
+        sidePage.add_widget(self.make_combo_group(GSettingsComboBox, _("Antialiasing"), "org.cinnamon.settings-daemon.plugins.xsettings", "antialiasing", None), True)
+        sidePage.add_widget(self.make_combo_group(GSettingsComboBox, _("Hinting"), "org.cinnamon.settings-daemon.plugins.xsettings", "hinting", None), True)
 
+    def make_combo_group(self, widget, group_label, root, key, ex1):
+        self.size_groups = getattr(self, "size_groups", [SizeGroup(SizeGroupMode.HORIZONTAL) for x in range(2)])
+        
+        box = Gtk.HBox()
+        label = Gtk.Label()
+        label.set_markup(group_label)
+        label.props.xalign = 0.0
+        self.size_groups[0].add_widget(label)
+        box.pack_start(label, False, False, 0)
+
+        if (key == "text-scaling-factor"):
+            w = widget("", root, key, None, adjustment_step = 0.1)
+        elif (key == "antialiasing"):
+            w = widget("", root, key, None, [(i, i.title()) for i in ("none", "grayscale", "rgba")])
+            w.set_tooltip_text(_("Antialiasing makes on screen text smoother and easier to read"))
+        elif (key == "hinting"):
+            w = widget("", root, key, None, [(i, i.title()) for i in ("none", "slight", "medium", "full")])
+            w.set_tooltip_text(_("Hinting allows for producing clear, legible text on screen."))
+        else:
+            w = widget("", root, key, None)
+
+        self.size_groups[1].add_widget(w)
+        box.pack_start(w, False, False, 15)
+        
+        return box
