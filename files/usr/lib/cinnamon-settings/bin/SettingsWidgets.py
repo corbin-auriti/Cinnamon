@@ -396,46 +396,6 @@ class GSettingsFontButton(Gtk.HBox):
         else:
             self.set_sensitive(not self.dep_settings.get_boolean(self.dep_key))
 
-#class GSettingsRange(Gtk.HBox):
-#    def __init__(self, label, schema, key, dep_key, **options):
-#        self.key = key
-#        self.dep_key = dep_key
-#        super(GSettingsRange, self).__init__()
-#        self.settings = Gio.Settings.new(schema)
-#        self.value = self.settings.get_double(self.key)
-#        
-#        self.label = Gtk.Label(label)
-#
-#        #returned variant is range:(min, max)
-#        _min, _max = self.settings.get_range(self.key)[1]
-#
-#        self.content_widget = Gtk.HScale.new_with_range(_min, _max, options.get('adjustment_step', 1))
-#        self.content_widget.set_value(self.value)
-#        if (label != ""):
-#            self.pack_start(self.label, False, False, 2)
-#        self.pack_start(self.content_widget, True, True, 2)
-#        self.content_widget.connect('value-changed', self.on_my_value_changed)
-#        self.content_widget.show_all()
-#        self.dependency_invert = False
-#        if self.dep_key is not None:
-#            if self.dep_key[0] == '!':
-#                self.dependency_invert = True
-#                self.dep_key = self.dep_key[1:]
-#            split = self.dep_key.split('/')
-#            self.dep_settings = Gio.Settings.new(split[0])
-#            self.dep_key = split[1]
-#            self.dep_settings.connect("changed::"+self.dep_key, self.on_dependency_setting_changed)
-#            self.on_dependency_setting_changed(self, None)
-#
-#    def on_my_value_changed(self, widget):
-#        self.settings.set_double(self.key, widget.get_value())
-#
-#    def on_dependency_setting_changed(self, settings, dep_key):
-#        if not self.dependency_invert:
-#            self.set_sensitive(self.dep_settings.get_boolean(self.dep_key))
-#        else:
-#            self.set_sensitive(not self.dep_settings.get_boolean(self.dep_key))
-
 class GSettingsRange(Gtk.HBox):
     def __init__(self, label, low_label, hi_label, low_limit, hi_limit, inverted, valtype, exponential, schema, key, dep_key, **options):
         super(GSettingsRange, self).__init__()
@@ -772,86 +732,6 @@ class GSettingsColorChooser(Gtk.ColorButton):
             self.set_sensitive(self.dep_settings.get_boolean(self.dep_key))
         else:
             self.set_sensitive(not self.dep_settings.get_boolean(self.dep_key))
-
-# class GConfFontButton(Gtk.HBox):
-#     def __init__(self, label, key):
-#         self.key = key
-#         super(GConfFontButton, self).__init__()
-#         self.settings = gconf.client_get_default()
-#         self.value = self.settings.get_string(key)
-        
-#         self.label = Gtk.Label(label)
-
-#         self.content_widget = Gtk.FontButton()
-#         self.content_widget.set_font_name(self.value)
-        
-#         if (label != ""):
-#             self.pack_start(self.label, False, False, 2)
-#         self.pack_start(self.content_widget, False, False, 2)
-#         self.content_widget.connect('font-set', self.on_my_value_changed)
-#         self.content_widget.show_all()
-#     def on_my_value_changed(self, widget):
-#         self.settings.set_string(self.key, widget.get_font_name())
-
-# class GConfComboBox(Gtk.HBox):    
-#     def __init__(self, label, key, options, init_value = ""):  
-#         self.key = key
-#         super(GConfComboBox, self).__init__()
-#         self.settings = gconf.client_get_default()  
-#         self.value = self.settings.get_string(self.key)
-#         if not self.value:
-#             self.value = init_value
-                      
-#         self.label = Gtk.Label(label)       
-#         self.model = Gtk.ListStore(str, str)
-#         selected = None
-#         for option in options:
-#             iter = self.model.insert_before(None, None)
-#             self.model.set_value(iter, 0, option[0])                
-#             self.model.set_value(iter, 1, option[1])                        
-#             if (option[0] == self.value):
-#                 selected = iter
-                                
-#         self.content_widget = Gtk.ComboBox.new_with_model(self.model)   
-#         renderer_text = Gtk.CellRendererText()
-#         self.content_widget.pack_start(renderer_text, True)
-#         self.content_widget.add_attribute(renderer_text, "text", 1)     
-        
-#         if selected is not None:
-#             self.content_widget.set_active_iter(selected)
-        
-#         if (label != ""):
-#             self.pack_start(self.label, False, False, 2)                
-#         self.pack_start(self.content_widget, False, False, 2)                     
-#         self.content_widget.connect('changed', self.on_my_value_changed)
-#         # The on_my_setting_changed callback raises a segmentation fault, need to investigate that
-#         #self.settings.add_dir(os.path.split(key)[0], gconf.CLIENT_PRELOAD_NONE)
-#         #self.settings.notify_add(self.key, self.on_my_setting_changed)
-#         self.content_widget.show_all()
-        
-#     def on_my_value_changed(self, widget):
-#         tree_iter = widget.get_active_iter()
-#         if tree_iter != None:            
-#             value = self.model[tree_iter][0]            
-#             self.settings.set_string(self.key, value)
-#     def on_my_setting_changed(self, client, cnxn_id, entry, args):
-#         print entry
-
-# class GConfCheckButton(Gtk.CheckButton):    
-#     def __init__(self, label, key):        
-#         self.key = key
-#         super(GConfCheckButton, self).__init__(label)       
-#         self.settings = gconf.client_get_default()
-#         self.set_active(self.settings.get_bool(self.key))
-#         self.settings.notify_add(self.key, self.on_my_setting_changed)
-#         self.connect('toggled', self.on_my_value_changed)            
-    
-#     def on_my_setting_changed(self, client, cnxn_id, entry):
-#         value = entry.value.get_bool()
-#         self.set_active(value)
-        
-#     def on_my_value_changed(self, widget):
-#         self.settings.set_bool(self.key, self.get_active())
 
 class DBusCheckButton(Gtk.CheckButton):    
     def __init__(self, label, service, path, get_method, set_method):        
