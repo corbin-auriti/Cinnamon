@@ -179,6 +179,20 @@ MyDesklet.prototype = {
             }
 
             if (image){
+                let height, width;
+                let imageRatio = image.width/image.height;
+                let frameRatio = this.width/this.height;
+
+                if (imageRatio > frameRatio) {
+                    width = this.width;
+                    height = this.width / imageRatio;
+                } else {
+                    height = this.height;
+                    width = this.height * imageRatio;
+                }
+
+                image.set_size(width, height);
+
                 this.currentPicture = image;
                 if (this.fade_delay > 0) {
                     Tweener.addTween(this._bin,
@@ -225,21 +239,7 @@ MyDesklet.prototype = {
             let file = Gio.file_new_for_path(filePath);
             let uri = file.get_uri();
 
-            let image = St.TextureCache.get_default().load_uri_sync(St.TextureCachePolicy.FOREVER, uri, this.width, this.height);
-
-            let frameRatio = this.height/this.width;
-            let imageRatio = image.height/image.width;
-
-            let height, width;            
-            if (frameRatio > imageRatio) {
-                width = this.width;
-                height = width * imageRatio;
-            } else {
-                height = this.height;
-                width = height / imageRatio;
-            }
-
-            image.set_size(width, height);
+            let image = St.TextureCache.get_default().load_uri_async(uri, this.width, this.height);
 
             image._path = filePath;
             this._images.push(image);
