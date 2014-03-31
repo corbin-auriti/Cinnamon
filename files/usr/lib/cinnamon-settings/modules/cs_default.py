@@ -348,6 +348,8 @@ class Module:
         for d in preferred_app_defs:
             table.addRow(d[PREF_LABEL], DefaultAppChooserButton(d[PREF_CONTENT_TYPE], d[PREF_GEN_CONTENT_TYPE]))
 
+        table.addRow(_("Terminal"), DefaultAppChooserButton(PREF_CONTENT_TYPE, PREF_GEN_CONTENT_TYPE))
+        
         return ColumnBox(_("Select preferred applications for file types"), table)
 
     def onMoreClicked(self, button):
