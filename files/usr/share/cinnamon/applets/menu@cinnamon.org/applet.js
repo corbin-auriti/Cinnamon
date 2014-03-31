@@ -28,6 +28,7 @@ const MAX_FAV_ICON_SIZE = 32;
 const CATEGORY_ICON_SIZE = 22;
 const APPLICATION_ICON_SIZE = 22;
 const MAX_RECENT_FILES = 20;
+const MAX_BUTTON_WIDTH = "max-width: 20em;";
 
 const USER_DESKTOP_PATH = FileUtils.getUserDesktopDir();
 
@@ -143,6 +144,7 @@ ApplicationContextMenuItem.prototype = {
                     enabled_applets.push("panel1:right:0:panel-launchers@cinnamon.org:" + new_applet_id);
                     global.settings.set_strv("enabled-applets", enabled_applets);
                 }
+                this._appButton.toggleMenu();
                 break;
             case "add_to_desktop":
                 let file = Gio.file_new_for_path(this._appButton.app.get_app_info().get_filename());
@@ -154,15 +156,21 @@ ApplicationContextMenuItem.prototype = {
                 }catch(e){
                     global.log(e);
                 }
+                this._appButton.toggleMenu();
                 break;
             case "add_to_favorites":
                 AppFavorites.getAppFavorites().addFavorite(this._appButton.app.get_id());
-                break;
+                this._appButton.toggleMenu();
+                break;                
             case "remove_from_favorites":
                 AppFavorites.getAppFavorites().removeFavorite(this._appButton.app.get_id());
+                this._appButton.toggleMenu();
                 break;
-        }
-        this._appButton.toggleMenu();
+            case "uninstall":
+                Util.spawnCommandLine("gksu -m '" + _("Please provide your password to uninstall this application") + "' /usr/bin/cinnamon-remove-application '" + this._appButton.app.get_app_info().get_filename() + "'");
+                this._appButton.appsMenuButton.menu.close();
+                break;
+        }        
         return false;
     }
 
@@ -186,7 +194,20 @@ GenericApplicationButton.prototype = {
             this.menu.actor.set_style_class_name('menu-context-menu');
             this.menu.connect('open-state-changed', Lang.bind(this, this._subMenuOpenStateChanged));
         }
+    }, 
+
+    highlight: function() {
+        this.actor.add_style_pseudo_class('highlighted');
     },
+
+    unhighlight: function() {
+        var app_key = this.app.get_id();
+        if (app_key == null) {
+            app_key = this.app.get_name() + ":" + this.app.get_description();
+        }
+        this.appsMenuButton._knownApps.push(app_key);
+        this.actor.remove_style_pseudo_class('highlighted');
+    },   
     
     _onButtonReleaseEvent: function (actor, event) {
         if (event.get_button()==1){
@@ -201,6 +222,7 @@ GenericApplicationButton.prototype = {
     },
     
     activate: function(event) {
+        this.unhighlight();    
         this.app.open_new_window(-1);
         this.appsMenuButton.menu.close();
     },
@@ -229,6 +251,10 @@ GenericApplicationButton.prototype = {
                 this.menu.addMenuItem(menuItem);
             }else{
                 menuItem = new ApplicationContextMenuItem(this, _("Add to favorites"), "add_to_favorites");
+                this.menu.addMenuItem(menuItem);
+            }
+            if (this.appsMenuButton._canUninstallApps) {
+                menuItem = new ApplicationContextMenuItem(this, _("Uninstall"), "uninstall");
                 this.menu.addMenuItem(menuItem);
             }
         }
@@ -312,6 +338,8 @@ TransientButton.prototype = {
         this.addActor(this.icon);
 
         this.label = new St.Label({ text: displayPath, style_class: 'menu-application-button-label' });
+        this.label.clutter_text.ellipsize = Pango.EllipsizeMode.END;        
+        this.label.set_style(MAX_BUTTON_WIDTH);
         this.addActor(this.label);
         this.isDraggableApp = false;
     },
@@ -356,12 +384,14 @@ ApplicationButton.prototype = {
         this.addActor(this.icon);
         this.name = this.app.get_name();
         this.label = new St.Label({ text: this.name, style_class: 'menu-application-button-label' });
+        this.label.clutter_text.ellipsize = Pango.EllipsizeMode.END;        
+        this.label.set_style(MAX_BUTTON_WIDTH);
         this.addActor(this.label);
         this._draggable = DND.makeDraggable(this.actor);
         this.isDraggableApp = true;
         this.icon.realize();
         this.label.realize();
-    },
+    },     
     
     get_app_id: function() {
         return this.app.get_id();
@@ -400,6 +430,8 @@ PlaceButton.prototype = {
         this.actor.set_style_class_name('menu-application-button');
         this.actor._delegate = this;
         this.label = new St.Label({ text: this.button_name, style_class: 'menu-application-button-label' });
+        this.label.clutter_text.ellipsize = Pango.EllipsizeMode.END;        
+        this.label.set_style(MAX_BUTTON_WIDTH);
         this.icon = place.iconFactory(APPLICATION_ICON_SIZE);
         if (!this.icon)
             this.icon = new St.Icon({icon_name: "folder", icon_size: APPLICATION_ICON_SIZE, icon_type: St.IconType.FULLCOLOR});
@@ -439,7 +471,7 @@ RecentButton.prototype = {
         this.actor._delegate = this;
         this.label = new St.Label({ text: this.button_name, style_class: 'menu-application-button-label' });
         this.label.clutter_text.ellipsize = Pango.EllipsizeMode.END;        
-        this.label.set_style("max-width: 50em;");
+        this.label.set_style(MAX_BUTTON_WIDTH);
         this.icon = file.createIcon(APPLICATION_ICON_SIZE);
         this.addActor(this.icon);
         this.addActor(this.label);
@@ -850,7 +882,10 @@ MyApplet.prototype = {
             this._activeActor = null;
             this._applicationsBoxWidth = 0;
             this.menuIsOpening = false;
-            
+            this._knownApps = new Array(); // Used to keep track of apps that are already installed, so we can highlight newly installed ones
+            this._appsWereRefreshed = false;
+            this._canUninstallApps = GLib.file_test("/usr/bin/cinnamon-remove-application", GLib.FileTest.EXISTS);
+
             this.RecentManager = new DocInfo.DocManager();
 
             this._display();
@@ -1358,7 +1393,7 @@ MyApplet.prototype = {
                         this._clearPrevAppSelection(button.actor);
                         button.actor.style_class = "menu-application-button-selected";
                         this.selectedAppTitle.set_text("");
-                        this.selectedAppDescription.set_text(button.place.id.slice(16));
+                        this.selectedAppDescription.set_text(button.place.id.slice(16).replace(/%20/g, ' '));
                         }));
                 button.actor.connect('leave-event', Lang.bind(this, function() {
                             this._previousSelectedActor = button.actor;
@@ -1427,7 +1462,7 @@ MyApplet.prototype = {
                         this._clearPrevAppSelection(button.actor);
                         button.actor.style_class = "menu-application-button-selected";
                         this.selectedAppTitle.set_text("");
-                        this.selectedAppDescription.set_text(button.file.uri.slice(7));
+                        this.selectedAppDescription.set_text(button.file.uri.slice(7).replace(/%20/g, ' '));
                         }));
                 button.actor.connect('leave-event', Lang.bind(this, function() {
                         button.actor.style_class = "menu-application-button";
@@ -1549,6 +1584,8 @@ MyApplet.prototype = {
             this.applicationsBox.add_actor(this._applicationsButtons[i].actor);
             this.applicationsBox.add_actor(this._applicationsButtons[i].menu.actor);
         }
+
+        this._appsWereRefreshed = true;
 
         this._refreshPlacesAndRecent();
     },
@@ -1678,7 +1715,23 @@ MyApplet.prototype = {
                     }
                     if (!(app_key in this._applicationsButtonFromApp)) {
 
-                        let applicationButton = new ApplicationButton(this, app);
+                        let applicationButton = new ApplicationButton(this, app);                        
+
+                        var app_is_known = false;
+                        for (var i = 0; i < this._knownApps.length; i++) {
+                            if (this._knownApps[i] == app_key) {
+                                app_is_known = true;
+                            }
+                        }
+                        if (!app_is_known) {
+                            if (this._appsWereRefreshed) {
+                                applicationButton.highlight();
+                            }
+                            else {
+                                this._knownApps.push(app_key);
+                            }
+                        }
+                    
                         applicationButton.actor.connect('realize', Lang.bind(this, this._onApplicationButtonRealized));
                         applicationButton.actor.connect('leave-event', Lang.bind(this, this._appLeaveEvent, applicationButton));
                         this._addEnterEvent(applicationButton, Lang.bind(this, this._appEnterEvent, applicationButton));
