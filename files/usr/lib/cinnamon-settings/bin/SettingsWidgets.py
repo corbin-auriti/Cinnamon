@@ -23,6 +23,7 @@ try:
     import tempfile
     import math
     import subprocess
+    import random
 
 except Exception, detail:
     print detail
@@ -50,6 +51,11 @@ class SidePage:
 
     def build(self):        
         # Clear all the widgets from the content box
+        widgets = self.content_box.get_children()
+        for widget in widgets:
+            self.content_box.remove(widget)
+
+        random.shuffle(self.widgets)
 
         if (self.module is not None):
             self.module.on_module_selected()
