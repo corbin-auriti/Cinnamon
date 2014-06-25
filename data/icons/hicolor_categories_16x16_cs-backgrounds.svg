@@ -16,7 +16,7 @@
    version="1.1"
    inkscape:version="0.48.4 r9939"
    viewBox="0 0 16 16"
-   sodipodi:docname="stock-image.svg"
+   sodipodi:docname="hicolor_categories_16x16_cs-backgrounds.svg"
    inkscape:export-filename="/usr/share/icons/hicolor/24x24/actions/stock-image.png"
    inkscape:export-xdpi="135"
    inkscape:export-ydpi="135">
@@ -134,9 +134,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
-     inkscape:zoom="14.405661"
-     inkscape:cx="8.487515"
-     inkscape:cy="-8.4093955"
+     inkscape:zoom="20.372681"
+     inkscape:cx="6.9114003"
+     inkscape:cy="3.0757361"
      inkscape:document-units="px"
      inkscape:current-layer="g4480-8"
      showgrid="false"
@@ -230,7 +230,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
