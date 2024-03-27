@@ -95,12 +95,6 @@ var PanelLoc = {
     right : 3
 };
 
-const PanelDefElement = {
-    ID  : 0,
-    MONITOR : 1,
-    POSITION: 2
-};
-
 // To make sure the panel corners blend nicely with the panel,
 // we draw background and borders the same way, e.g. drawing
 // them as filled shapes from the outside inwards instead of
@@ -320,7 +314,7 @@ function convertSettingsLMonToXMon(strv) {
 
         let x_mon = lmon;
         if (!Meta.is_wayland_compositor()) {
-            x_mon = global.display.logical_index_to_xinerama_index(lmon);
+            let x_mon = global.display.logical_index_to_xinerama_index(lmon);
         }
 
         out.push(`${id}:${x_mon}:${pos}`);
@@ -401,7 +395,6 @@ PanelManager.prototype = {
         this._setMainPanel();
 
         this.addPanelMode = false;
-        this.handling_panels_changed = false;
 
         this._panelsEnabledId   = global.settings.connect("changed::panels-enabled", Lang.bind(this, this._onPanelsEnabledChanged));
         this._panelEditModeId   = global.settings.connect("changed::panel-edit-mode", Lang.bind(this, this._onPanelEditModeChanged));
@@ -428,59 +421,25 @@ PanelManager.prototype = {
         let monitor = 0;
         let stash = [];     // panel id, monitor, panel type
 
-        let monitorCount = global.display.get_n_monitors();
+        let monitorCount = -1;
         let panels_used = []; // [monitor] [top, bottom, left, right].  Used to keep track of which panel types are in use,
                               // as we need knowledge of the combinations in order to instruct the correct panel to create a corner
 
-        let panel_defs = getPanelsEnabledList();
+        let panelProperties = getPanelsEnabledList();
         //
         // First pass through just to count the monitors, as there is no ordering to rely on
         //
-        let good_defs = [];
-        let removals = [];
-        for (let i = 0, len = panel_defs.length; i < len; i++) {
-            let elements = panel_defs[i].split(":");
+        for (let i = 0, len = panelProperties.length; i < len; i++) {
+            let elements = panelProperties[i].split(":");
             if (elements.length != 3) {
-                global.log("Invalid panel definition: " + panel_defs[i]);
-                removals.push(i);
+                global.log("Invalid panel definition: " + panelProperties[i]);
                 continue;
             }
 
-            if (elements[PanelDefElement.MONITOR] >= monitorCount) {
-                // Ignore, but don't remove. Less monitors can be a temporary condition.
-                global.log("Ignoring panel definition for nonexistent monitor: " + panel_defs[i]);
-                continue;
-            }
-
-            // Some sanitizing
-            if (good_defs.find((good_def) => {
-                const good_elements = good_def.split(":");
-                // Ignore any duplicate IDs
-                if (good_elements[PanelDefElement.ID] === elements[PanelDefElement.ID]) {
-                    global.log("Duplicate ID detected in panel definition: " + panel_defs[i]);
-                    return true;
-                }
-                // Ignore any duplicate monitor/position combinations
-                if ((good_elements[PanelDefElement.MONITOR] === elements[PanelDefElement.MONITOR]) && (good_elements[PanelDefElement.POSITION] === elements[PanelDefElement.POSITION])) {
-                    global.log("Duplicate monitor+position detected in panel definition: " + panel_defs[i]);
-                    return true;
-                }
-
-                return false;
-            })) {
-                removals.push(panel_defs[i]);
-                continue;
-            }
-
-            good_defs.push(panel_defs[i]);
+            monitor = parseInt(elements[1]);
+            if (monitor > monitorCount)
+                monitorCount = monitor;
         }
-
-        if (removals.length > 0) {
-            let clean_defs = panel_defs.filter((def) => !removals.includes(def));
-            global.log("Removing invalid panel definitions: " + removals);
-            setPanelsEnabledList(clean_defs);
-        }
-
         //
         // initialise the array that records which panels are used (so combinations can be used to select corners)
         //
@@ -494,15 +453,19 @@ PanelManager.prototype = {
         //
         // set up the list of panels
         //
-        for (let i = 0, len = good_defs.length; i < len; i++) {
-            let elements = good_defs[i].split(":");
+        for (let i = 0, len = panelProperties.length; i < len; i++) {
+            let elements = panelProperties[i].split(":");
+            if (elements.length != 3) {
+                global.log("Invalid panel definition: " + panelProperties[i]);
+                continue;
+            }
+            let jj = getPanelLocFromName(elements[2]);  // panel orientation
 
-            let jj = getPanelLocFromName(elements[PanelDefElement.POSITION]);  // panel orientation
+            monitor = parseInt(elements[1]);
 
-            monitor = parseInt(elements[PanelDefElement.MONITOR]);
             panels_used[monitor][jj] = true;
 
-            stash[i] = [parseInt(elements[PanelDefElement.ID]), monitor, jj]; // load what we are going to use to call loadPanel into an array
+            stash[i] = [parseInt(elements[0]),monitor,jj]; // load what we are going to use to call loadPanel into an array
         }
 
         //
@@ -923,10 +886,6 @@ PanelManager.prototype = {
      * i.e. when panels are added, moved or removed.
      */
     _onPanelsEnabledChanged: function() {
-        if (this.handling_panels_changed)
-            return;
-        this.handling_panels_changed = true;
-
         let newPanels = new Array(this.panels.length);
         let newMeta = new Array(this.panels.length);
         let drawcorner = [false,false];
@@ -1021,8 +980,6 @@ PanelManager.prototype = {
                 Lang.bind(this, function() { Util.spawnCommandLine("cinnamon-settings panel"); }));
             lastPanelRemovedDialog.open();
         }
-
-        this.handling_panels_changed = false;
     },
 
     /**
@@ -1681,19 +1638,19 @@ PanelCorner.prototype = {
     }
 }; // end of panel corner
 
-function SettingsLauncher(label, keyword, icon) {
-    this._init(label, keyword, icon);
+function SettingsLauncher(label, keyword, icon, command) {
+    this._init(label, keyword, icon, command);
 }
 
 SettingsLauncher.prototype = {
     __proto__: PopupMenu.PopupIconMenuItem.prototype,
 
-    _init: function (label, keyword, icon) {
+    _init: function (label, keyword, icon, command) {
         PopupMenu.PopupIconMenuItem.prototype._init.call(this, label, icon, St.IconType.SYMBOLIC);
 
         this._keyword = keyword;
         this.connect('activate', Lang.bind(this, function() {
-            Util.spawnCommandLine("cinnamon-settings " + this._keyword);
+            Util.spawnCommandLine(command + " " + this._keyword);
         }));
     },
 };
@@ -1711,10 +1668,10 @@ PanelContextMenu.prototype = {
         this.actor.hide();
         this.panelId = panelId;
 
-        let moreSettingsMenuItem = new SettingsLauncher(_("Panel settings"), "panel " + panelId, "emblem-system");
+        let moreSettingsMenuItem = new SettingsLauncher(_("Panel settings"), "panel " + panelId, "emblem-system", "cinnamon-settings");
         this.addMenuItem(moreSettingsMenuItem);
 
-        let applet_settings_item = new SettingsLauncher(_("Applets"), "applets panel" + panelId, "application-x-addon");
+        let applet_settings_item = new SettingsLauncher(_("Applets"), "applets panel" + panelId, "application-x-addon", "cinnamon-settings");
         this.addMenuItem(applet_settings_item);
 
         let menu = this;
@@ -1818,8 +1775,33 @@ PanelContextMenu.prototype = {
 
         menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem()); // separator line
         menu.addMenuItem(menu.troubleshootItem);
+        
+        // Add the System Monitor launcher
+        let systemMonitorInfo = this._findFirstSystemMonitor();
+        if (systemMonitorInfo) {
+            this.addMenuItem(new SettingsLauncher(systemMonitorInfo.name, "", systemMonitorInfo.icon, systemMonitorInfo.command));
+        }
 
-        this.addMenuItem(new SettingsLauncher(_("System Settings"), "", "preferences-desktop"));
+        this.addMenuItem(new SettingsLauncher(_("System Settings"), "", "system-run", "cinnamon-settings"));
+    },
+
+     _findFirstSystemMonitor: function() {
+        let appInfoList = Gio.AppInfo.get_all();
+        for (let appInfo of appInfoList) {
+            if (appInfo.should_show()) {
+                let categories = appInfo.get_categories();
+                //Finds the first available system monitor based on category filters
+                if (categories && categories.includes('System') && categories.includes('Monitor') && !categories.includes('Utility')) {
+                    // Return the app name, icon, and executable command
+                    return {
+                        name: appInfo.get_display_name(),
+                        icon: appInfo.get_icon().to_string(),
+                        command: appInfo.get_executable()
+                    };
+                }
+            }
+        }
+        return null;
     },
 
     open: function(animate) {
